@@ -3,13 +3,6 @@
 ## In Progress
 
 ## Ready to Start
-- [ ] TSK-002 **ZIP Extraction + Safety Checks**
-  - Scope: Implement ZIP extraction into `/tmp/eval/<jobId>/workspace` with size and path traversal protections.
-  - Acceptance:
-    - Rejects non-zip payloads
-    - Rejects zip entries with `../` or absolute paths
-    - Enforces max extracted size (e.g. 20 MB)
-
 - [ ] TSK-003 **Pre-flight Validation (package.json + file allowlist)**
   - Scope: Parse `package.json` and enforce dependency + scripts policy and allowed paths.
   - Acceptance:
@@ -49,3 +42,11 @@
     - `npm init` and base deps installed (express, multer, jest, supertest)
     - `index.js` + `src/server.js` created with `/health` and `POST /evaluate`
     - `engine/` folder scaffolded with `evaluateJob`, `extractZip`, `preflight`, `dockerRun`, `resultFormat` stubs wired into `/evaluate`.
+
+- [x] TSK-002 **ZIP Extraction + Safety Checks**
+  - Notes:
+    - Implemented `engine/extractZip.js` using `yauzl` for streaming extraction.
+    - Enforces path traversal protection (`..`, absolute paths, drive letters).
+    - Enforces max extracted size with a running byte counter (default 20MB).
+    - Rejects non-zip buffers with a clear `Invalid ZIP data` error.
+    - Returns `{ workspaceDir }` on successful extraction.
