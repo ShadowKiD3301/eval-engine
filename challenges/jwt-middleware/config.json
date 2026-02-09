@@ -1,0 +1,10 @@
+{
+  "id": "jwt-middleware",
+  "runner": "express-supertest",
+  "entry": "src/app.js",
+  "timeoutSec": 10,
+  "allowedDependencies": ["express", "jsonwebtoken"],
+  "allowedPaths": ["src/"],
+  "requiredFiles": ["src/app.js"],
+  "description": "Implement JWT-based authentication middleware for Express routes."
+}

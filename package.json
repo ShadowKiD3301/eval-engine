@@ -1,0 +1,31 @@
+{
+  "name": "eval-engine",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShadowKiD3301/eval-engine.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ShadowKiD3301/eval-engine/issues"
+  },
+  "homepage": "https://github.com/ShadowKiD3301/eval-engine#readme",
+  "dependencies": {
+    "express": "^5.2.1",
+    "jest": "^30.2.0",
+    "multer": "^2.0.2",
+    "supertest": "^7.2.2"
+  }
+}
