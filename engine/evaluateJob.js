@@ -1,10 +1,11 @@
 // Core entry point for running an evaluation job.
-// TSK-001+: scaffold + preflight wiring; Docker runner will follow in TSK-004.
+// TSK-001+: scaffold + preflight + Docker wiring.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { extractZip } = require('./extractZip');
 const { preflightValidate } = require('./preflight');
+const { runInDocker } = require('./dockerRun');
 
 function buildJobId() {
   const ts = Date.now().toString(36);
@@ -32,12 +33,10 @@ async function loadChallengeConfig(challengeId) {
 }
 
 async function evaluateJob({ challengeId, submissionBuffer, filename }) {
-  // TODO (TSK-004+):
-  // 5. Spawn Docker runner
-  // 6. Normalize and return result
   const jobId = buildJobId();
   const workspaceDir = path.join(os.tmpdir(), 'eval', jobId, 'workspace');
 
+  // 1–2: Extract ZIP safely into a per-job workspace
   await extractZip({
     jobId,
     zipBuffer: submissionBuffer,
@@ -45,19 +44,35 @@ async function evaluateJob({ challengeId, submissionBuffer, filename }) {
     filename,
   });
 
+  // 3: Load challenge config
   const challengeConfig = await loadChallengeConfig(challengeId);
 
-  // TSK-003: run preflight before any Docker work.
+  // 4: Run preflight validation (package.json, deps, required files, etc.)
   await preflightValidate({ workspaceDir, challengeConfig });
 
-  return {
-    jobId,
-    challengeId,
-    status: 'error',
-    durationMs: 0,
-    tests: [],
-    logs: 'Docker runner not implemented yet (TSK-004).',
-  };
+  // 5: Spawn Docker runner (TSK-004).
+  // In dev/test, runInDocker may be configured to stub or skip actual Docker.
+  try {
+    const dockerResult = await runInDocker({ workspaceDir, challengeConfig, jobId });
+
+    return {
+      jobId,
+      challengeId,
+      status: dockerResult.exitCode === 0 ? 'completed' : 'error',
+      durationMs: dockerResult.durationMs ?? 0,
+      tests: dockerResult.tests || [],
+      logs: dockerResult.logs || '',
+    };
+  } catch (error) {
+    return {
+      jobId,
+      challengeId,
+      status: 'error',
+      durationMs: 0,
+      tests: [],
+      logs: `Evaluation failed: ${error.message}`,
+    };
+  }
 }
 
 module.exports = {
