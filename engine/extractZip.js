@@ -4,6 +4,7 @@ const path = require('path');
 const yauzl = require('yauzl');
 
 const DEFAULT_MAX_BYTES = 20 * 1024 * 1024;
+const DEFAULT_MAX_ENTRIES = 2000;
 
 function isUnsafeEntryName(entryName) {
   const normalized = entryName.replace(/\\/g, '/');
@@ -16,6 +17,13 @@ function isUnsafeEntryName(entryName) {
   const segments = normalized.split('/');
   if (segments.includes('..')) return true;
   return false;
+}
+
+function isSymlinkEntry(entry) {
+  const attrs = Number(entry && entry.externalFileAttributes);
+  if (!Number.isFinite(attrs)) return false;
+  const mode = (attrs >>> 16) & 0o170000;
+  return mode === 0o120000;
 }
 
 function ensureWithinTarget(targetDir, entryName) {
@@ -46,8 +54,15 @@ async function extractEntry(zipfile, entry, targetDir, state) {
   if (!entryName) {
     throw new Error('Zip entry missing file name.');
   }
+  state.entryCount += 1;
+  if (state.entryCount > state.maxEntries) {
+    throw new Error('Zip entry count exceeds maximum allowed entries.');
+  }
   if (isUnsafeEntryName(entryName)) {
     throw new Error(`Unsafe zip entry path: ${entryName}`);
+  }
+  if (isSymlinkEntry(entry)) {
+    throw new Error(`Symlink entries are not allowed: ${entryName}`);
   }
 
   const { destPath } = ensureWithinTarget(targetDir, entryName);
@@ -101,7 +116,13 @@ async function extractEntry(zipfile, entry, targetDir, state) {
 
 // Example:
 // await extractZip({ jobId, zipBuffer, targetDir: '/tmp/eval/123/workspace' });
-async function extractZip({ jobId, zipBuffer, targetDir, maxBytes = DEFAULT_MAX_BYTES }) {
+async function extractZip({
+  jobId,
+  zipBuffer,
+  targetDir,
+  maxBytes = DEFAULT_MAX_BYTES,
+  maxEntries = DEFAULT_MAX_ENTRIES,
+}) {
   if (!zipBuffer || !Buffer.isBuffer(zipBuffer)) {
     throw new Error('Invalid zipBuffer: expected a Buffer.');
   }
@@ -119,7 +140,7 @@ async function extractZip({ jobId, zipBuffer, targetDir, maxBytes = DEFAULT_MAX_
     throw new Error(`Invalid ZIP data${jobId ? ` (job ${jobId})` : ''}: ${msg}`);
   }
 
-  const state = { totalBytes: 0, maxBytes };
+  const state = { totalBytes: 0, maxBytes, entryCount: 0, maxEntries };
 
   await new Promise((resolve, reject) => {
     const onError = (err) => reject(err);

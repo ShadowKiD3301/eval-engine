@@ -11,7 +11,14 @@ const DEFAULT_DOCKER_IMAGE = 'eval-engine-runner:latest';
 const DEFAULT_DOCKER_BIN = 'docker';
 const DEFAULT_USER = '1000:1000';
 
-function buildDockerArgs({ workspaceDir, challengeConfig, dockerImage, runnerDir, challengesDir }) {
+function buildDockerArgs({
+  workspaceDir,
+  challengeConfig,
+  dockerImage,
+  runnerDir,
+  challengesDir,
+  containerName,
+}) {
   if (!workspaceDir) {
     throw new Error('workspaceDir is required to run in Docker.');
   }
@@ -27,6 +34,8 @@ function buildDockerArgs({ workspaceDir, challengeConfig, dockerImage, runnerDir
   return [
     'run',
     '--rm',
+    '--name',
+    containerName,
     '--network',
     'none',
     '--user',
@@ -62,6 +71,8 @@ async function runInDocker({ workspaceDir, challengeConfig, options = {} }) {
   const dockerImage = options.dockerImage || DEFAULT_DOCKER_IMAGE;
   const dockerBin = options.dockerBin || DEFAULT_DOCKER_BIN;
   const spawnFn = options.spawn || spawn;
+  const containerName = options.containerName
+    || `eval-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
   if (process.env.EVAL_ENGINE_SKIP_DOCKER === '1' || process.env.NODE_ENV === 'test') {
     return {
@@ -79,11 +90,13 @@ async function runInDocker({ workspaceDir, challengeConfig, options = {} }) {
     dockerImage,
     runnerDir,
     challengesDir,
+    containerName,
   });
 
   return new Promise((resolve) => {
     const stdoutChunks = [];
     const stderrChunks = [];
+    const cleanupErrors = [];
     let timedOut = false;
     let settled = false;
 
@@ -97,11 +110,35 @@ async function runInDocker({ workspaceDir, challengeConfig, options = {} }) {
       resolve(result);
     };
 
+    const recordCleanupError = (label, err) => {
+      if (!err) return;
+      const message = err && err.message ? err.message : String(err);
+      cleanupErrors.push(`${label}: ${message}`);
+    };
+
+    const spawnCleanup = (args, label) => {
+      try {
+        const proc = spawnFn(dockerBin, args, { stdio: 'ignore' });
+        if (proc && typeof proc.on === 'function') {
+          proc.on('error', (err) => recordCleanupError(label, err));
+        }
+      } catch (err) {
+        recordCleanupError(label, err);
+      }
+    };
+
+    const cleanupContainer = () => {
+      if (!containerName) return;
+      spawnCleanup(['kill', containerName], 'docker kill failed');
+      spawnCleanup(['rm', '-f', containerName], 'docker rm failed');
+    };
+
     const timeoutHandle = setTimeout(() => {
       timedOut = true;
       if (child && typeof child.kill === 'function') {
         child.kill('SIGKILL');
       }
+      cleanupContainer();
     }, timeoutMs);
 
     if (child.stdout) {
@@ -114,10 +151,13 @@ async function runInDocker({ workspaceDir, challengeConfig, options = {} }) {
     child.on('error', (error) => {
       clearTimeout(timeoutHandle);
       const durationMs = Date.now() - startTime;
+      const cleanupNote = cleanupErrors.length > 0
+        ? `\nDocker cleanup errors:\n${cleanupErrors.map((entry) => `- ${entry}`).join('\n')}`
+        : '';
       finalize({
         exitCode: null,
         durationMs,
-        logs: `Docker execution failed: ${error.message}`,
+        logs: `Docker execution failed: ${error.message}${cleanupNote}`,
       });
     });
 
@@ -150,10 +190,13 @@ async function runInDocker({ workspaceDir, challengeConfig, options = {} }) {
       }
       const timeoutNote = timedOut ? '\nDocker execution timed out.' : '';
       const exitCode = timedOut ? 124 : code;
+      const cleanupNote = cleanupErrors.length > 0
+        ? `\nDocker cleanup errors:\n${cleanupErrors.map((entry) => `- ${entry}`).join('\n')}`
+        : '';
       finalize({
         exitCode: runnerResult && Number.isFinite(runnerResult.exitCode) ? runnerResult.exitCode : exitCode,
         durationMs,
-        logs: `${logs}${timeoutNote}`,
+        logs: `${logs}${timeoutNote}${cleanupNote}`,
         rawResultJson,
         status: runnerResult ? runnerResult.status : undefined,
         tests: runnerResult ? runnerResult.tests : undefined,

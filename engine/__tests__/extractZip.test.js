@@ -37,6 +37,9 @@ function buildZip(entries) {
     const nameBuf = Buffer.from(entry.name, 'utf8');
     const dataBuf = Buffer.isBuffer(entry.data) ? entry.data : Buffer.from(entry.data, 'utf8');
     const checksum = crc32(dataBuf);
+    const externalAttrs = Number.isFinite(entry.externalFileAttributes)
+      ? entry.externalFileAttributes
+      : 0;
     const localHeader = Buffer.concat([
       u32(0x04034b50),
       u16(20),
@@ -70,7 +73,7 @@ function buildZip(entries) {
       u16(0),
       u16(0),
       u16(0),
-      u32(0),
+      u32(externalAttrs),
       u32(offset),
       nameBuf,
     ]);
@@ -144,6 +147,18 @@ describe('extractZip', () => {
     });
   });
 
+  test('rejects entries with Windows drive-letter paths', async () => {
+    const zipBuffer = buildZip([{ name: 'C:/abs.txt', data: 'nope' }]);
+
+    await withTempDir(async (tempDir) => {
+      await expect(extractZip({
+        jobId: 'job-3b',
+        zipBuffer,
+        targetDir: tempDir,
+      })).rejects.toThrow(/Unsafe zip entry path|absolute path|drive/i);
+    });
+  });
+
   test('enforces maxBytes (size over limit throws)', async () => {
     const zipBuffer = buildZip([{ name: 'file.txt', data: '12345' }]);
 
@@ -154,6 +169,41 @@ describe('extractZip', () => {
         targetDir: tempDir,
         maxBytes: 4,
       })).rejects.toThrow(/exceeds maximum allowed bytes/);
+    });
+  });
+
+  test('rejects when entry count exceeds maxEntries', async () => {
+    const entries = [
+      { name: 'a.txt', data: 'a' },
+      { name: 'b.txt', data: 'b' },
+      { name: 'c.txt', data: 'c' },
+    ];
+    const zipBuffer = buildZip(entries);
+
+    await withTempDir(async (tempDir) => {
+      await expect(extractZip({
+        jobId: 'job-5',
+        zipBuffer,
+        targetDir: tempDir,
+        maxEntries: 2,
+      })).rejects.toThrow(/entry count exceeds maximum/i);
+    });
+  });
+
+  test('rejects symlink entries', async () => {
+    const symlinkAttrs = 0o120777 * 0x10000;
+    const zipBuffer = buildZip([{
+      name: 'link',
+      data: 'target.txt',
+      externalFileAttributes: symlinkAttrs,
+    }]);
+
+    await withTempDir(async (tempDir) => {
+      await expect(extractZip({
+        jobId: 'job-6',
+        zipBuffer,
+        targetDir: tempDir,
+      })).rejects.toThrow(/Symlink entries are not allowed/i);
     });
   });
 });

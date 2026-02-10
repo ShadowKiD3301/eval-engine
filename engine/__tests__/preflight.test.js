@@ -125,4 +125,45 @@ describe('preflightValidate', () => {
       })).rejects.toThrow(/outside allowedPaths/);
     });
   });
+
+  test('fails when package.json is missing', async () => {
+    await withWorkspace(async (workspaceDir) => {
+      await fs.promises.mkdir(path.join(workspaceDir, 'src'), { recursive: true });
+      await fs.promises.writeFile(path.join(workspaceDir, 'src/app.js'), 'module.exports = {}');
+
+      await expect(preflightValidate({
+        workspaceDir,
+        challengeConfig: {
+          allowedDependencies: jwtConfig.allowedDependencies,
+          allowedPaths: jwtConfig.allowedPaths,
+          requiredFiles: jwtConfig.requiredFiles,
+        },
+      })).rejects.toThrow(/Missing package\.json/);
+    });
+  });
+
+  test('fails when required files are missing', async () => {
+    await withWorkspace(async (workspaceDir) => {
+      await writeJson(path.join(workspaceDir, 'package.json'), {
+        name: 'submission',
+        version: '1.0.0',
+        dependencies: {
+          express: '^5.2.1',
+          jsonwebtoken: '^9.0.0',
+        },
+      });
+
+      await fs.promises.mkdir(path.join(workspaceDir, 'src'), { recursive: true });
+      await fs.promises.writeFile(path.join(workspaceDir, 'src/app.js'), 'module.exports = {}');
+
+      await expect(preflightValidate({
+        workspaceDir,
+        challengeConfig: {
+          allowedDependencies: jwtConfig.allowedDependencies,
+          allowedPaths: jwtConfig.allowedPaths,
+          requiredFiles: ['src/missing.js'],
+        },
+      })).rejects.toThrow(/Required file missing/);
+    });
+  });
 });

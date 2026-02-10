@@ -14,10 +14,20 @@ function buildJobId() {
   return `job-${ts}-${rand}`;
 }
 
-async function loadChallengeConfig(challengeId) {
+function validateChallengeId(challengeId) {
   if (!challengeId || typeof challengeId !== 'string') {
     throw new Error('Invalid challengeId: expected a string.');
   }
+  if (challengeId.includes('..') || challengeId.includes('/') || challengeId.includes('\\')) {
+    throw new Error(`Invalid challengeId: ${challengeId}`);
+  }
+  if (!/^[a-z0-9-]+$/.test(challengeId)) {
+    throw new Error(`Invalid challengeId: ${challengeId} (must match ^[a-z0-9-]+$)`);
+  }
+}
+
+async function loadChallengeConfig(challengeId) {
+  validateChallengeId(challengeId);
   const configPath = path.join(__dirname, '..', 'challenges', challengeId, 'config.json');
   let raw;
   try {
@@ -34,6 +44,7 @@ async function loadChallengeConfig(challengeId) {
 }
 
 async function evaluateJob({ challengeId, submissionBuffer, filename }) {
+  validateChallengeId(challengeId);
   const jobId = buildJobId();
   const workspaceDir = path.join(os.tmpdir(), 'eval', jobId, 'workspace');
 
@@ -75,4 +86,5 @@ async function evaluateJob({ challengeId, submissionBuffer, filename }) {
 
 module.exports = {
   evaluateJob,
+  validateChallengeId,
 };
