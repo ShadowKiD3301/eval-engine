@@ -1,0 +1,63 @@
+---
+sidebar_position: 5
+title: Architecture (Diagrams)
+---
+
+```mermaid
+flowchart LR
+  client[Client
+(API / Platform)] -->|multipart form-data
+challengeId + submission.zip| api[Eval Engine API
+POST /evaluate]
+
+  api --> core[Engine Core
+- extract zip
+- preflight validate
+- run in docker
+- normalize result]
+
+  core --> fsTmp[(Host tmp workspace
+/tmp/eval/<jobId>/workspace)]
+
+  core -->|docker run
+--network none
+--user 1000:1000| docker[(Docker container
+"eval-engine-runner:latest")]
+
+  fsTmp -->|mount rw| docker
+  tests[Hidden tests
+challenges/<id>/tests] -->|mount ro
+/challenge/tests| docker
+  runner[Runner scripts
+runner/*.js] -->|mount ro
+/runner| docker
+
+  docker -->|stdout/stderr + JSON result| core
+  core -->|normalized JSON| api
+  api --> client
+```
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant A as API (Express)
+  participant E as Engine Core
+  participant D as Docker
+
+  C->>A: POST /evaluate (challengeId, submission.zip)
+  A->>E: evaluateJob(challengeId, buffer)
+  E->>E: extractZip() -> /tmp/eval/<jobId>/workspace
+  E->>E: preflightValidate()
+  E->>D: docker run (mount workspace, tests, runner)
+  D-->>E: logs + JSON result line
+  E->>E: normalizeResult()
+  E-->>A: result JSON
+  A-->>C: 200 OK + result JSON
+```
+
+## Notes
+
+- The runner resolves dependencies via `NODE_PATH`:
+  - `/app/node_modules` (runner deps: jest, supertest)
+  - `/deps/<challengeId>/node_modules` (challenge runtime deps)
+- Hidden tests are copied into `/workspace/challenge/tests` so relative imports like `../../src/app` work.
