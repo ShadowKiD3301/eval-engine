@@ -135,6 +135,23 @@ describe('extractZip', () => {
     });
   });
 
+  test('cleans up targetDir after extraction error', async () => {
+    const zipBuffer = buildZip([
+      { name: 'src/app.js', data: 'console.log(\"ok\");' },
+      { name: '../evil.txt', data: 'nope' },
+    ]);
+
+    await withTempDir(async (tempDir) => {
+      await expect(extractZip({
+        jobId: 'job-cleanup',
+        zipBuffer,
+        targetDir: tempDir,
+      })).rejects.toThrow(/Unsafe zip entry path|invalid relative path/i);
+
+      await expect(fs.promises.stat(tempDir)).rejects.toThrow(/ENOENT/);
+    });
+  });
+
   test('rejects entries with absolute paths', async () => {
     const zipBuffer = buildZip([{ name: '/abs.txt', data: 'nope' }]);
 

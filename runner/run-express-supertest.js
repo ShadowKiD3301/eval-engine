@@ -17,7 +17,21 @@ function resolveEntryPath(entry) {
   if (!entry || typeof entry !== 'string') {
     throw new Error('Challenge config entry is missing or invalid.');
   }
-  return path.resolve('/workspace', entry);
+  const normalized = entry.replace(/\\/g, '/');
+  if (path.isAbsolute(normalized) || /^[A-Za-z]:/.test(normalized)) {
+    throw new Error('Challenge config entry must be a relative path.');
+  }
+  const cleaned = path.posix.normalize(normalized);
+  const segments = cleaned.split('/');
+  if (segments.includes('..')) {
+    throw new Error('Challenge config entry cannot contain path traversal.');
+  }
+  const resolved = path.resolve('/workspace', cleaned);
+  const workspaceRoot = path.resolve('/workspace');
+  if (resolved !== workspaceRoot && !resolved.startsWith(`${workspaceRoot}${path.sep}`)) {
+    throw new Error('Challenge config entry resolves outside workspace.');
+  }
+  return resolved;
 }
 
 function loadApp(entryPath) {
@@ -148,4 +162,8 @@ async function run() {
   }
 }
 
-run();
+if (require.main === module) {
+  run();
+}
+
+module.exports = { resolveEntryPath };

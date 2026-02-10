@@ -99,6 +99,7 @@ async function runInDocker({ workspaceDir, challengeConfig, options = {} }) {
     const cleanupErrors = [];
     let timedOut = false;
     let settled = false;
+    let hardTimeoutHandle = null;
 
     const child = spawnFn(dockerBin, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -107,6 +108,10 @@ async function runInDocker({ workspaceDir, challengeConfig, options = {} }) {
     const finalize = (result) => {
       if (settled) return;
       settled = true;
+      if (hardTimeoutHandle) {
+        clearTimeout(hardTimeoutHandle);
+        hardTimeoutHandle = null;
+      }
       resolve(result);
     };
 
@@ -139,6 +144,22 @@ async function runInDocker({ workspaceDir, challengeConfig, options = {} }) {
         child.kill('SIGKILL');
       }
       cleanupContainer();
+      if (!hardTimeoutHandle) {
+        const hardTimeoutMs = Math.max(1, Math.floor(timeoutMs));
+        hardTimeoutHandle = setTimeout(() => {
+          const durationMs = Date.now() - startTime;
+          const stdout = Buffer.concat(stdoutChunks).toString('utf8');
+          const stderr = Buffer.concat(stderrChunks).toString('utf8');
+          const cleanupNote = cleanupErrors.length > 0
+            ? `\nDocker cleanup errors:\n${cleanupErrors.map((entry) => `- ${entry}`).join('\n')}`
+            : '';
+          finalize({
+            exitCode: 124,
+            durationMs,
+            logs: `${stdout}${stderr}\nDocker execution timed out.${cleanupNote}`,
+          });
+        }, hardTimeoutMs);
+      }
     }, timeoutMs);
 
     if (child.stdout) {

@@ -142,25 +142,30 @@ async function extractZip({
 
   const state = { totalBytes: 0, maxBytes, entryCount: 0, maxEntries };
 
-  await new Promise((resolve, reject) => {
-    const onError = (err) => reject(err);
-    zipfile.on('error', onError);
+  try {
+    await new Promise((resolve, reject) => {
+      const onError = (err) => reject(err);
+      zipfile.on('error', onError);
 
-    zipfile.readEntry();
-    zipfile.on('entry', (entry) => {
-      extractEntry(zipfile, entry, targetDir, state)
-        .then(() => zipfile.readEntry())
-        .catch((err) => {
-          zipfile.close();
-          reject(err);
-        });
-    });
+      zipfile.readEntry();
+      zipfile.on('entry', (entry) => {
+        extractEntry(zipfile, entry, targetDir, state)
+          .then(() => zipfile.readEntry())
+          .catch((err) => {
+            zipfile.close();
+            reject(err);
+          });
+      });
 
-    zipfile.on('end', () => {
-      zipfile.close();
-      resolve();
+      zipfile.on('end', () => {
+        zipfile.close();
+        resolve();
+      });
     });
-  });
+  } catch (err) {
+    await fs.promises.rm(targetDir, { recursive: true, force: true });
+    throw err;
+  }
 
   return { workspaceDir: targetDir };
 }

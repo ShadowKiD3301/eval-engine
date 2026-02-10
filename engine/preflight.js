@@ -30,6 +30,10 @@ function normalizeRelPath(inputPath, label) {
   if (normalized.startsWith('/') || /^[A-Za-z]:/.test(normalized)) {
     throw new Error(`Invalid ${label}: must be relative, got ${inputPath}`);
   }
+  const rawSegments = normalized.split('/');
+  if (rawSegments.includes('..')) {
+    throw new Error(`Invalid ${label}: path traversal not allowed (${inputPath})`);
+  }
   const cleaned = path.posix.normalize(normalized);
   if (cleaned === '..' || cleaned.startsWith('../') || cleaned.includes('/../')) {
     throw new Error(`Invalid ${label}: path traversal not allowed (${inputPath})`);

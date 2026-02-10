@@ -166,4 +166,88 @@ describe('preflightValidate', () => {
       })).rejects.toThrow(/Required file missing/);
     });
   });
+
+  test('normalizes backslashes in allowedPaths and requiredFiles', async () => {
+    await withWorkspace(async (workspaceDir) => {
+      await writeJson(path.join(workspaceDir, 'package.json'), {
+        name: 'submission',
+        version: '1.0.0',
+        dependencies: {
+          express: '^5.2.1',
+          jsonwebtoken: '^9.0.0',
+        },
+      });
+
+      await fs.promises.mkdir(path.join(workspaceDir, 'src'), { recursive: true });
+      await fs.promises.writeFile(path.join(workspaceDir, 'src/app.js'), 'module.exports = {}');
+
+      await expect(preflightValidate({
+        workspaceDir,
+        challengeConfig: {
+          allowedDependencies: jwtConfig.allowedDependencies,
+          allowedPaths: ['src\\'],
+          requiredFiles: ['src\\app.js'],
+        },
+      })).resolves.toBeUndefined();
+    });
+  });
+
+  test('accepts dot segments within allowedPaths', async () => {
+    await withWorkspace(async (workspaceDir) => {
+      await writeJson(path.join(workspaceDir, 'package.json'), {
+        name: 'submission',
+        version: '1.0.0',
+        dependencies: {
+          express: '^5.2.1',
+          jsonwebtoken: '^9.0.0',
+        },
+      });
+
+      await fs.promises.mkdir(path.join(workspaceDir, 'src'), { recursive: true });
+      await fs.promises.writeFile(path.join(workspaceDir, 'src/app.js'), 'module.exports = {}');
+
+      await expect(preflightValidate({
+        workspaceDir,
+        challengeConfig: {
+          allowedDependencies: jwtConfig.allowedDependencies,
+          allowedPaths: ['src/'],
+          requiredFiles: ['./src/app.js', 'src/./app.js'],
+        },
+      })).resolves.toBeUndefined();
+    });
+  });
+
+  test('rejects traversal in requiredFiles', async () => {
+    await withWorkspace(async (workspaceDir) => {
+      await writeJson(path.join(workspaceDir, 'package.json'), {
+        name: 'submission',
+        version: '1.0.0',
+        dependencies: {
+          express: '^5.2.1',
+          jsonwebtoken: '^9.0.0',
+        },
+      });
+
+      await fs.promises.mkdir(path.join(workspaceDir, 'src'), { recursive: true });
+      await fs.promises.writeFile(path.join(workspaceDir, 'src/app.js'), 'module.exports = {}');
+
+      await expect(preflightValidate({
+        workspaceDir,
+        challengeConfig: {
+          allowedDependencies: jwtConfig.allowedDependencies,
+          allowedPaths: ['src/'],
+          requiredFiles: ['../src/app.js'],
+        },
+      })).rejects.toThrow(/path traversal/i);
+
+      await expect(preflightValidate({
+        workspaceDir,
+        challengeConfig: {
+          allowedDependencies: jwtConfig.allowedDependencies,
+          allowedPaths: ['src/'],
+          requiredFiles: ['src/../app.js'],
+        },
+      })).rejects.toThrow(/path traversal/i);
+    });
+  });
 });

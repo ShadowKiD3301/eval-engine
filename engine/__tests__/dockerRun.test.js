@@ -59,6 +59,39 @@ describe('runInDocker timeout cleanup', () => {
     ]));
   });
 
+  test('hard timeout resolves when child never closes', async () => {
+    let child = null;
+    const spawnMock = jest.fn((bin, args) => {
+      if (args[0] === 'run') {
+        child = new EventEmitter();
+        child.stdout = new EventEmitter();
+        child.stderr = new EventEmitter();
+        child.kill = jest.fn();
+        return child;
+      }
+      return new EventEmitter();
+    });
+
+    const promise = runInDocker({
+      workspaceDir: '/tmp/workspace',
+      challengeConfig: { id: 'jwt-middleware', timeoutSec: 0.001 },
+      options: {
+        spawn: spawnMock,
+        dockerBin: 'docker',
+        runnerDir: '/runner',
+        challengesDir: '/challenges',
+        containerName: 'test-container',
+      },
+    });
+
+    jest.advanceTimersByTime(5);
+
+    const result = await promise;
+    expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+    expect(result.exitCode).toBe(124);
+    expect(result.logs).toMatch(/timed out/i);
+  });
+
   test('captures cleanup errors in logs without crashing', async () => {
     let child = null;
     const spawnMock = jest.fn((bin, args) => {
