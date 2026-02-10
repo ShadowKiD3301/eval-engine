@@ -4,32 +4,32 @@ import styles from './styles.module.css';
 
 const FeatureList = [
   {
-    title: 'Easy to Use',
+    title: 'Sandboxed Execution',
     Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        Submissions run in a Docker container with no network access, strict
+        resource limits, and read-only test mounts.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
+    title: 'Deterministic Results',
     Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Preflight validation, hidden tests, and result normalization keep
+        outputs consistent and debuggable.
       </>
     ),
   },
   {
-    title: 'Powered by React',
+    title: 'Challenge-Driven',
     Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Each challenge ships with config, hidden tests, and runtime dependencies
+        baked into the runner image.
       </>
     ),
   },
