@@ -118,6 +118,28 @@ async function run() {
 
     const { runCLI } = require('jest');
 
+    // Jest expects tests to live under the project root. Our hidden tests are mounted
+    // under /challenge/tests, so we symlink them into the writable workspace.
+    // Place tests under /workspace/challenge/tests so relative imports like
+    // require('../../src/app') resolve correctly (../../ from tests -> /workspace).
+    const hiddenRoot = path.resolve('/workspace/challenge/tests');
+    fs.mkdirSync(hiddenRoot, { recursive: true });
+
+    const linkedTestFiles = [];
+    for (const absTestFile of testFiles) {
+      const rel = path.relative(testsDir, absTestFile);
+      const target = path.join(hiddenRoot, rel);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      try {
+        // Overwrite if it already exists from a prior run.
+        fs.rmSync(target, { force: true });
+      } catch (_) {
+        // ignore
+      }
+      fs.copyFileSync(absTestFile, target);
+      linkedTestFiles.push(target);
+    }
+
     const argv = {
       runInBand: true,
       json: true,
@@ -125,7 +147,7 @@ async function run() {
       testLocationInResults: false,
       reporters: ['default'],
       runTestsByPath: true,
-      _: testFiles,
+      _: linkedTestFiles,
       cache: false,
       rootDir: process.cwd(),
       testEnvironment: 'node',

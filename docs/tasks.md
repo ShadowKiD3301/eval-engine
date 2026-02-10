@@ -34,6 +34,12 @@
   - Blocker: Decide on DB (Postgres vs. SQLite) and schema integration timing.
 
 ## Done ✓
+- [x] TSK-008 **Fix runner NODE_PATH / test discovery inside Docker**
+  - Notes:
+    - Docker now sets `NODE_PATH=/app/node_modules:/deps/<challengeId>/node_modules` so the runner can `require('jest')`.
+    - Ensures the mounted workspace root is writable by the non-root container user (chmod 0777) so the runner can materialize tests.
+    - Runner copies hidden tests into `/workspace/challenge/tests` so relative imports like `../../src/app` resolve correctly.
+
 - [x] TSK-000 **PRD & Initial Architecture Draft**
   - Notes: `docs/prd.md` and `docs/architecture.md` created for Evaluation Engine MVP.
 
