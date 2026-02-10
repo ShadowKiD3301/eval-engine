@@ -6,6 +6,7 @@ const path = require('path');
 const { extractZip } = require('./extractZip');
 const { preflightValidate } = require('./preflight');
 const { runInDocker } = require('./dockerRun');
+const { normalizeResult } = require('./resultFormat');
 
 function buildJobId() {
   const ts = Date.now().toString(36);
@@ -55,14 +56,11 @@ async function evaluateJob({ challengeId, submissionBuffer, filename }) {
   try {
     const dockerResult = await runInDocker({ workspaceDir, challengeConfig, jobId });
 
-    return {
+    return normalizeResult({
       jobId,
       challengeId,
-      status: dockerResult.exitCode === 0 ? 'completed' : 'error',
-      durationMs: dockerResult.durationMs ?? 0,
-      tests: dockerResult.tests || [],
-      logs: dockerResult.logs || '',
-    };
+      rawRunnerResult: dockerResult,
+    });
   } catch (error) {
     return {
       jobId,

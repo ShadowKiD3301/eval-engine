@@ -126,11 +126,37 @@ async function runInDocker({ workspaceDir, challengeConfig, options = {} }) {
       const durationMs = Date.now() - startTime;
       const stdout = Buffer.concat(stdoutChunks).toString('utf8');
       const stderr = Buffer.concat(stderrChunks).toString('utf8');
+      let rawResultJson = null;
+      let runnerResult = null;
+      let logs = `${stdout}${stderr}`;
+      const stdoutLines = stdout.split(/\r?\n/).filter((line) => line.trim().length > 0);
+      if (stdoutLines.length > 0) {
+        const lastLine = stdoutLines[stdoutLines.length - 1];
+        try {
+          runnerResult = JSON.parse(lastLine);
+          rawResultJson = runnerResult && runnerResult.rawResultJson ? runnerResult.rawResultJson : null;
+          const jsonIndex = stdout.lastIndexOf(lastLine);
+          if (jsonIndex >= 0) {
+            logs = `${stdout.slice(0, jsonIndex)}${stdout.slice(jsonIndex + lastLine.length)}${stderr}`;
+          }
+        } catch (err) {
+          rawResultJson = null;
+        }
+      }
+      if (runnerResult && runnerResult.logs) {
+        if (!logs.includes(runnerResult.logs)) {
+          logs = logs.trim().length > 0 ? `${runnerResult.logs}\n${logs}` : runnerResult.logs;
+        }
+      }
       const timeoutNote = timedOut ? '\nDocker execution timed out.' : '';
+      const exitCode = timedOut ? 124 : code;
       finalize({
-        exitCode: timedOut ? 124 : code,
+        exitCode: runnerResult && Number.isFinite(runnerResult.exitCode) ? runnerResult.exitCode : exitCode,
         durationMs,
-        logs: `${stdout}${stderr}${timeoutNote}`,
+        logs: `${logs}${timeoutNote}`,
+        rawResultJson,
+        status: runnerResult ? runnerResult.status : undefined,
+        tests: runnerResult ? runnerResult.tests : undefined,
       });
     });
   });
