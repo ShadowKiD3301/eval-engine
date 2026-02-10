@@ -1,0 +1,10 @@
+{
+  "name": "jwt-middleware-runtime",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

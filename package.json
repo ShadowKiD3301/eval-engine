@@ -8,7 +8,8 @@
   },
   "scripts": {
     "test": "jest",
-    "dev": "node index.js"
+    "dev": "node index.js",
+    "build:runner-image": "docker build -t eval-engine-runner:latest -f docker/Dockerfile ."
   },
   "repository": {
     "type": "git",

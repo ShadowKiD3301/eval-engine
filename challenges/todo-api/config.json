@@ -1,0 +1,10 @@
+{
+  "id": "todo-api",
+  "runner": "express-supertest",
+  "entry": "src/app.js",
+  "timeoutSec": 10,
+  "allowedDependencies": ["express"],
+  "allowedPaths": ["src/"],
+  "requiredFiles": ["src/app.js"],
+  "description": "Build a RESTful TODO API with CRUD endpoints, validation, and proper HTTP status codes."
+}
