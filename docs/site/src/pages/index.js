@@ -15,12 +15,17 @@ function HomepageHeader() {
         <Heading as="h1" className="hero__title">
           {siteConfig.title}
         </Heading>
-        <p className="hero__subtitle">{siteConfig.tagline}</p>
+        <p className="hero__subtitle">
+          Secure offline judge for Node.js/Express challenges
+        </p>
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
-            to="/docs/intro">
-            Docusaurus Tutorial - 5min ⏱️
+            to="/docs/overview">
+            Read the Docs
+          </Link>
+          <Link className="button button--primary button--lg" to="/docs/getting-started">
+            Get Started
           </Link>
         </div>
       </div>

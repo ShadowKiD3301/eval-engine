@@ -1,11 +1,11 @@
 ---
-sidebar_position: 3
+sidebar_position: 6
 title: Challenges
 ---
 
 # Challenges
 
-Challenges live under:
+Each challenge lives under `challenges/<challengeId>/` with a `config.json` and hidden Jest tests.
 
 ```
 challenges/<challengeId>/
@@ -26,40 +26,77 @@ Example:
   "allowedDependencies": ["express"],
   "allowedPaths": ["src/"],
   "requiredFiles": ["src/app.js"],
-  "description": "Build a RESTful TODO API..."
+  "description": "Build a RESTful TODO API with CRUD endpoints, validation, and proper HTTP status codes."
 }
 ```
 
 Key fields:
-- `runner`: which runner implementation to use (MVP: `express-supertest`)
-- `entry`: where the submission exports an Express app
-- `timeoutSec`: hard evaluation timeout
-- `allowedDependencies`: allowlist enforced by preflight
-- `allowedPaths` + `requiredFiles`: file policy / minimum structure
 
-## Included challenges
+- `runner`: runner implementation (MVP: `express-supertest`)
+- `entry`: relative path to the user’s Express app export
+- `timeoutSec`: hard execution timeout
+- `allowedDependencies`: allowlist enforced during preflight
+- `allowedPaths`: directories that users may modify
+- `requiredFiles`: files that must exist in the submission
+
+## Existing challenges
 
 ### `jwt-middleware`
-- Focus: JWT auth middleware + protected routes
-- Allowed deps: `express`, `jsonwebtoken`
+
+Contract (from hidden tests):
+
+- App exported from `src/app.js`
+- Uses `express.json()` for JSON bodies
+- `POST /login` returns a JWT for valid credentials
+- `GET /profile` and `GET /admin` are protected by JWT middleware
+- `GET /public` is accessible without a token
+
+Allowed dependencies:
+
+- `express`
+- `jsonwebtoken`
 
 ### `todo-api`
-- Focus: CRUD REST API behavior + status codes
-- Allowed deps: `express`
 
-## Adding a new challenge
+Contract (from hidden tests):
 
-1. Create `challenges/<id>/config.json`
-2. Add hidden tests to `challenges/<id>/tests/*.test.js`
-3. Add runtime deps for the sandbox image:
+- App exported from `src/app.js`
+- `GET /todos` returns an array (initially empty)
+- `POST /todos` validates input and creates a todo
+- `GET /todos/:id`, `PATCH /todos/:id`, `DELETE /todos/:id` behave as expected
+
+Allowed dependencies:
+
+- `express`
+
+## Add a new challenge (end-to-end)
+
+1. Create a new directory:
+
+```
+challenges/<id>/
+```
+
+2. Add `config.json` with allowed deps, allowed paths, and required files.
+
+3. Add hidden tests under:
+
+```
+challenges/<id>/tests/*.test.js
+```
+
+4. Add runtime dependencies for the container image:
 
 ```
 docker/challenges/<id>/package.json
 ```
 
-4. Update `docker/Dockerfile` to install/copy `/deps/<id>/node_modules`
-5. Rebuild:
+5. Update `docker/Dockerfile` to copy `/deps/<id>/node_modules` into the final image.
+
+6. Rebuild the runner image:
 
 ```bash
 npm run build:runner-image
 ```
+
+7. Restart the API and evaluate a submission using the new `challengeId`.
