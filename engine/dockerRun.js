@@ -1,5 +1,6 @@
 // TSK-004: Docker runner integration
 
+const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -10,6 +11,8 @@ const DEFAULT_PIDS_LIMIT = '256';
 const DEFAULT_DOCKER_IMAGE = 'eval-engine-runner:latest';
 const DEFAULT_DOCKER_BIN = 'docker';
 const DEFAULT_USER = '1000:1000';
+const DEPS_ROOT = '/deps';
+const RUNNER_NODE_MODULES = '/app/node_modules';
 
 function buildDockerArgs({
   workspaceDir,
@@ -30,6 +33,12 @@ function buildDockerArgs({
   const runnerScript = `run-${challengeConfig.runner || 'express-supertest'}.js`;
   const runnerPath = `/runner/${runnerScript}`;
   const challengeConfigJson = JSON.stringify(challengeConfig);
+
+  // Allow runner scripts to resolve both:
+  // - runner dependencies (jest, supertest) installed in the image
+  // - challenge-specific runtime deps baked under /deps/<challengeId>/node_modules
+  const depsNodePath = `${DEPS_ROOT}/${challengeConfig.id}/node_modules`;
+  const nodePath = `${RUNNER_NODE_MODULES}:${depsNodePath}`;
 
   return [
     'run',
@@ -56,6 +65,8 @@ function buildDockerArgs({
     `${runnerDir}:/runner:ro`,
     '-e',
     `CHALLENGE_CONFIG=${challengeConfigJson}`,
+    '-e',
+    `NODE_PATH=${nodePath}`,
     dockerImage,
     'node',
     runnerPath,
@@ -80,6 +91,14 @@ async function runInDocker({ workspaceDir, challengeConfig, options = {} }) {
       durationMs: 0,
       logs: 'Docker execution skipped (EVAL_ENGINE_SKIP_DOCKER or NODE_ENV=test).',
     };
+  }
+
+  // Ensure the mounted workspace is writable by the non-root container user.
+  // (ZIP extraction typically runs as root on the host, resulting in 0755 dirs.)
+  try {
+    fs.chmodSync(workspaceDir, 0o777);
+  } catch (_err) {
+    // Best-effort: if we can't chmod, Docker run may fail with EACCES.
   }
 
   const runnerDir = options.runnerDir || path.resolve(__dirname, '..', 'runner');
